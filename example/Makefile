@@ -16,7 +16,8 @@ TARGET="helloworld"
 all:
 	cc -O -gdwarf-2  -I../lib -o ${TARGET} main.c ${LIBS}
 	cc -O -gdwarf-2  -I../lib -o ${TARGET}_epoll main_epoll.c ${LIBS}
-	cc -O -gdwarf-2  -I../lib -o ping ping.c ${LIBS}
+	cc -O -gdwarf-2  -I../lib -I${FF_DPDK}/include -o nse nse.c ${LIBS}
+	cc -O -gdwarf-2  -I../lib -I${FF_DPDK}/include -o ping ping.c ${LIBS}
 .PHONY: clean
 clean:
-	rm -f *.o ${TARGET} ${TARGET}_epoll ping
+	rm -f *.o ${TARGET} ${TARGET}_epoll nse ping

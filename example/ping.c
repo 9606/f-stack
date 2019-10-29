@@ -7,9 +7,6 @@
 #include <arpa/inet.h>
 #include <assert.h>
 
-#include "ff_config.h"
-#include "ff_api.h"
-
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include <netinet/ip_icmp.h>
@@ -18,6 +15,14 @@
 #include <sys/time.h>
 #include <netdb.h>
 #include <err.h>
+
+#include <rte_ether.h>
+#include <rte_ip.h>
+#include <rte_tcp.h>
+#include <rte_udp.h>
+
+#include "ff_config.h"
+#include "ff_api.h"
 
 #define MAX_EVENTS 512
 
@@ -205,8 +210,51 @@ int recv_loop(void *arg) {
     }
 }
 
+int get_hash(uint32_t a, uint32_t b, uint32_t c, uint32_t d) {
+    int s = 0;
+    s = ((s << 2) + (a >> 4)) ^ (a << 10);
+    s = ((s << 2) + (b >> 4)) ^ (b << 10);
+    s = ((s << 2) + (c >> 4)) ^ (c << 10);
+    s = ((s << 2) + (d >> 4)) ^ (d << 10);
+
+    s = s % 0x7FFFFFFF;
+    s = s < 0 ? s + 0x7FFFFFFF : s;
+    return s;
+}
+
+int pipeline_dispatch_cb(void *data, uint16_t *len,
+                         uint16_t queue_id, uint16_t nb_queues) {
+    struct ipv4_hdr *iph;
+    int iph_len;
+    uint32_t hash;
+
+    iph = (struct ipv4_hdr *) (data + ETHER_HDR_LEN);
+    iph_len = (iph->version_ihl & 0x0f) << 2;
+
+    if (iph->next_proto_id != IPPROTO_IP) {
+        return queue_id;
+    }
+
+    iph = (struct ipv4_hdr *) ((char *) iph + iph_len);
+    iph_len = (iph->version_ihl & 0x0f) << 2;
+
+    if (iph->next_proto_id == IPPROTO_TCP) {
+        struct tcp_hdr *tcph = (struct tcp_hdr *) ((char *) iph + iph_len);
+        hash = get_hash(iph->src_addr, iph->dst_addr, tcph->src_port, tcph->dst_port);
+    } else if (iph->next_proto_id == IPPROTO_UDP) {
+        struct udp_hdr *udph = (struct udp_hdr *) ((char *) iph + iph_len);
+        hash = get_hash(iph->src_addr, iph->dst_addr, udph->src_port, udph->dst_port);
+    } else {
+        return queue_id;
+    }
+
+    return hash % nb_queues;
+}
+
 int main(int argc, char *argv[]) {
     ff_init(argc, argv);
+    /* regist a packet dispath function */
+    ff_regist_packet_dispatcher(pipeline_dispatch_cb);
 
     assert((kq = ff_kqueue()) > 0);
 
