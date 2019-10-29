@@ -276,7 +276,7 @@ int main(int argc, char *argv[]) {
         return -1;
     }
 
-    memcpy(dest_addr_str, argv[3], strlen(argv[3]) + 1);
+    memcpy(dest_addr_str, argv[argc - 1], strlen(argv[argc - 1]) + 1);
 
     rawsock = ff_socket(AF_INET, SOCK_RAW, protocol->p_proto);
     if (rawsock < 0) {
@@ -291,9 +291,9 @@ int main(int argc, char *argv[]) {
 
     dest.sin_family = AF_INET;
 
-    inaddr = inet_addr(argv[3]);
+    inaddr = inet_addr(argv[argc - 1]);
     if (inaddr == INADDR_NONE) {
-        host = gethostbyname(argv[3]);
+        host = gethostbyname(argv[argc - 1]);
         if (host == NULL) {
             printf("Fail to gethostbyname!\n");
             return -1;
