@@ -53,6 +53,8 @@ pid_t pid;
 struct sockaddr_in dest;
 struct timeval start_time;
 struct timeval end_time;
+struct timeval last_time;
+struct timeval now_time;
 struct timeval time_interval;
 
 void ping_stats_show() {
@@ -161,6 +163,7 @@ char send_buf[128];
 char recv_buf[256];
 
 int send_packet() {
+    gettimeofday(&last_time, NULL);
     memset(send_buf, 0, sizeof(send_buf));
     if (alive) {
         int size = 0;
@@ -179,10 +182,22 @@ int send_packet() {
 int first_icmp = 1;
 
 int recv_loop(void *arg) {
-    if (alive && first_icmp == 1) {
+
+    if (!alive) {
+        return 0;
+    }
+
+    if (first_icmp == 1) {
         gettimeofday(&start_time, NULL);
         send_packet();
         first_icmp = 0;
+    } else {
+        gettimeofday(&now_time, NULL);
+        time_interval = cal_time_offset(last_time, now_time);
+        long time = time_interval.tv_sec * 1000 + time_interval.tv_usec / 1000;
+        if (time > 1000) {
+            send_packet();
+        }
     }
 
     /* Wait for events to happen */
