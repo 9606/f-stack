@@ -274,7 +274,6 @@ int main(int argc, char *argv[]) {
     assert((kq = ff_kqueue()) > 0);
 
     int size = 128 * 1024;//128k
-    struct protoent *protocol = NULL;
     char dest_addr_str[80];
     memset(dest_addr_str, 0, 80);
     unsigned int inaddr = 1;
@@ -285,15 +284,9 @@ int main(int argc, char *argv[]) {
         return -1;
     }
 
-    protocol = getprotobyname("icmp");
-    if (protocol == NULL) {
-        printf("Fail to getprotobyname!\n");
-        return -1;
-    }
-
     memcpy(dest_addr_str, argv[argc - 1], strlen(argv[argc - 1]) + 1);
 
-    rawsock = ff_socket(AF_INET, SOCK_RAW, protocol->p_proto);
+    rawsock = ff_socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
     if (rawsock < 0) {
         printf("Fail to create socket!\n");
         return -1;
