@@ -195,7 +195,7 @@ int recv_loop(void *arg) {
         gettimeofday(&now_time, NULL);
         time_interval = cal_time_offset(last_time, now_time);
         long time = time_interval.tv_sec * 1000 + time_interval.tv_usec / 1000;
-        if (time > 1000) {
+        if (time > 3000) {
             send_packet();
         }
     }

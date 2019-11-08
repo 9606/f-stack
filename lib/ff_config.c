@@ -673,7 +673,7 @@ dpdk_args_setup(struct ff_config *cfg)
         }
         sprintf(temp, "--no-pci");
         dpdk_argv[n++] = strdup(temp);
-        sprintf(temp, "--file-prefix=container");
+        // sprintf(temp, "--file-prefix=container");
         dpdk_argv[n++] = strdup(temp);
     }
 
