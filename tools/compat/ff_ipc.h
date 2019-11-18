@@ -28,6 +28,7 @@
 #define _FF_IPC_H_
 
 #include "ff_msg.h"
+#include "ff_event.h"
 
 /* Set F-Stack proccess id to communicate with */
 void ff_set_proc_id(int pid);
@@ -38,5 +39,18 @@ int ff_ipc_msg_free(struct ff_msg *msg);
 
 int ff_ipc_send(const struct ff_msg *msg);
 int ff_ipc_recv(struct ff_msg **msg, enum FF_MSG_TYPE msg_type);
+
+/* POSIX-LIKE-IPC api begin */
+int ff_ipc_socket(int domain, int type, int protocol);
+int ff_ipc_sock_connect(int s, const struct sockaddr *name, socklen_t namelen);
+
+ssize_t ff_ipc_sock_read(int d, void *buf, size_t nbytes);
+ssize_t ff_ipc_sock_send(int s, const void *buf, size_t len, int flags);
+
+int ff_ipc_kqueue(void);
+int ff_ipc_kevent(int kq, const struct kevent *changelist, int nchanges,
+                  struct kevent *eventlist, int nevents, const struct timespec *timeout);
+
+/* POSIX-LIKE-IPC api end */
 
 #endif

@@ -341,7 +341,7 @@ init_mem_pool(void)
         } else {
             printf("create mbuf pool on socket %d\n", socketid);
         }
-        
+
 #ifdef FF_USE_PAGE_ARRAY
         nb_mbuf = RTE_ALIGN_CEIL (
             nb_ports*nb_lcores*MAX_PKT_BURST    +
@@ -442,8 +442,8 @@ init_msg_ring(void)
     /* Create message buffer pool */
     if (rte_eal_process_type() == RTE_PROC_PRIMARY) {
         message_pool = rte_mempool_create(FF_MSG_POOL,
-           MSG_RING_SIZE * 2 * nb_procs,
-           MAX_MSG_BUF_SIZE, MSG_RING_SIZE / 2, 0,
+           MSG_RING_SIZE * FF_MSG_NUM * nb_procs,
+           MAX_MSG_BUF_SIZE, MSG_RING_SIZE / 2 * FF_MSG_NUM, 0,
            NULL, NULL, ff_msg_init, NULL,
            socketid, 0);
     } else {
@@ -1193,6 +1193,77 @@ handle_top_msg(struct ff_msg *msg)
     msg->result = 0;
 }
 
+static inline void
+handle_socket_msg(struct ff_msg *msg) {
+    int socket_fd = ff_socket(msg->socket.domain, msg->socket.type, msg->socket.protocol);
+    msg->socket.socket_fd = socket_fd;
+    if (socket_fd < 0) {
+        msg->result = errno;
+    } else {
+        msg->result = 0;
+    }
+}
+
+static inline void
+handle_sock_connect_msg(struct ff_msg *msg) {
+    int rt = ff_connect(msg->sock_connect.s, msg->sock_connect.name, msg->sock_connect.namelen);
+    msg->sock_connect.rt = rt;
+
+    if (rt < 0) {
+        msg->result = errno;
+    } else {
+        msg->result = 0;
+    }
+}
+
+static inline void
+handle_kqueue_msg(struct ff_msg *msg) {
+    int kq = ff_kqueue();
+    msg->kqueue.kq = kq;
+    if (kq < 0) {
+        msg->result = errno;
+    } else {
+        msg->result = 0;
+    }
+}
+
+static inline void
+handle_kevent_msg(struct ff_msg *msg) {
+    int rt = ff_kevent(msg->kevent.kq, msg->kevent.changelist, msg->kevent.nchanges,
+            msg->kevent.eventlist, msg->kevent.nevents, msg->kevent.timeout);
+    msg->kevent.rt = rt;
+
+    if (rt < 0) {
+        msg->result = errno;
+    } else {
+        msg->result = 0;
+    }
+}
+
+static inline void
+handle_sock_read_msg(struct ff_msg *msg) {
+    int rt = ff_read(msg->sock_read.d, msg->sock_read.buf, msg->sock_read.nbytes);
+    msg->sock_read.rt = rt;
+
+    if (rt < 0) {
+        msg->result = errno;
+    } else {
+        msg->result = 0;
+    }
+}
+
+static inline void
+handle_sock_send_msg(struct ff_msg *msg) {
+    int rt = ff_send(msg->sock_send.s, msg->sock_send.buf, msg->sock_send.len, msg->sock_send.flags);
+    msg->sock_send.rt = rt;
+
+    if (rt < 0) {
+        msg->result = errno;
+    } else {
+        msg->result = 0;
+    }
+}
+
 #ifdef FF_NETGRAPH
 static inline void
 handle_ngctl_msg(struct ff_msg *msg)
@@ -1291,6 +1362,24 @@ handle_msg(struct ff_msg *msg, uint16_t proc_id)
         case FF_TRAFFIC:
             handle_traffic_msg(msg);
             break;
+        case FF_SOCKET:
+            handle_socket_msg(msg);
+            break;
+        case FF_SOCKET_CONNECT:
+            handle_sock_connect_msg(msg);
+            break;
+        case FF_KEVENT:
+            handle_kevent_msg(msg);
+            break;
+        case FF_SOCK_READ:
+            handle_sock_read_msg(msg);
+            break;
+        case FF_SOCK_SEND:
+            handle_sock_send_msg(msg);
+            break;
+        case FF_KQUEUE:
+            handle_kqueue_msg(msg);
+            break;
         default:
             handle_default_msg(msg);
             break;
@@ -1328,7 +1417,7 @@ send_burst(struct lcore_conf *qconf, uint16_t n, uint8_t port)
             ff_dump_packets(qconf->pcap[port], m_table[i]);
         }
     }
-    
+
     ret = rte_eth_tx_burst(port, queueid, m_table, n);
     ff_traffic.tx_packets += ret;
     uint16_t i;
@@ -1338,7 +1427,7 @@ send_burst(struct lcore_conf *qconf, uint16_t n, uint8_t port)
         if (qconf->tx_mbufs[port].bsd_m_table[i])
             ff_enq_tx_bsdmbuf(port, qconf->tx_mbufs[port].bsd_m_table[i], m_table[i]->nb_segs);
 #endif
-    }    
+    }
     if (unlikely(ret < n)) {
         do {
             rte_pktmbuf_free(m_table[ret]);
@@ -1723,10 +1812,10 @@ ff_rss_check(void *softc, uint32_t saddr, uint32_t daddr,
 
     uint32_t hash = 0;
     if ( !use_rsskey_52bytes )
-        hash = toeplitz_hash(sizeof(default_rsskey_40bytes), 
+        hash = toeplitz_hash(sizeof(default_rsskey_40bytes),
             default_rsskey_40bytes, datalen, data);
     else
-        hash = toeplitz_hash(sizeof(default_rsskey_52bytes), 
+        hash = toeplitz_hash(sizeof(default_rsskey_52bytes),
 	    default_rsskey_52bytes, datalen, data);
     return ((hash & (reta_size - 1)) % nb_queues) == queueid;
 }

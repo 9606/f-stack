@@ -44,7 +44,12 @@ enum FF_MSG_TYPE {
     FF_NGCTL,
     FF_IPFW_CTL,
     FF_TRAFFIC,
-
+    FF_SOCKET,
+    FF_SOCKET_CONNECT,
+    FF_KQUEUE,
+    FF_KEVENT,
+    FF_SOCK_READ,
+    FF_SOCK_SEND,
     /*
      * to add other msg type before FF_MSG_NUM
      */
@@ -106,6 +111,49 @@ struct ff_traffic_args {
     uint64_t tx_bytes;
 };
 
+struct ff_socket_args {
+    int domain;
+    int type;
+    int protocol;
+    int socket_fd;
+};
+
+struct ff_sock_connect_args {
+    int s;
+    struct linux_sockaddr *name;
+    socklen_t namelen;
+    int rt;
+};
+
+struct ff_kqueue_args {
+    int kq;
+};
+
+struct ff_kevent_args {
+    int kq;
+    struct kevent *changelist;
+    int nchanges;
+    struct kevent *eventlist;
+    int nevents;
+    struct timespec *timeout;
+    int rt;
+};
+
+struct ff_sock_read_args {
+    int d;
+    void *buf;
+    size_t nbytes;
+    ssize_t rt;
+};
+
+struct ff_sock_send_args {
+    int s;
+    void *buf;
+    size_t len;
+    int flags;
+    ssize_t rt;
+};
+
 #define MAX_MSG_BUF_SIZE 10240
 
 /* structure of ipc msg */
@@ -126,6 +174,12 @@ struct ff_msg {
         struct ff_ngctl_args ngctl;
         struct ff_ipfw_args ipfw;
         struct ff_traffic_args traffic;
+        struct ff_socket_args socket;
+        struct ff_sock_connect_args sock_connect;
+        struct ff_kqueue_args kqueue;
+        struct ff_kevent_args kevent;
+        struct ff_sock_read_args sock_read;
+        struct ff_sock_send_args sock_send;
     };
 } __attribute__((packed)) __rte_cache_aligned;
 

@@ -1,4 +1,4 @@
-SUBDIRS=compat libutil libmemstat libxo libnetgraph sysctl ifconfig route top netstat ngctl ipfw arp traffic
+SUBDIRS=compat libutil libmemstat libxo libnetgraph sysctl ifconfig route top netstat ngctl ipfw arp traffic ping
 PREFIX_BIN=/usr/local/bin
 
 all:
