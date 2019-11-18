@@ -114,11 +114,12 @@ parse_lcore_mask(struct ff_config *cfg, const char *coremask)
             if ((1 << j) & val) {
                 proc_lcore[count] = idx;
                 if (cfg->dpdk.proc_id == count) {
-		    zero_num = idx >> 2;
+                    zero_num = idx >> 2;
                     shift = idx & 0x3;
                     memset(zero,'0',zero_num);
-                    sprintf(buf, "%llx%s", (unsigned long long)1<<shift, zero);
-                    cfg->dpdk.proc_mask = strdup(buf);                
+                    snprintf(buf, sizeof(buf) - 1, "%llx%s",
+                        (unsigned long long)1<<shift, zero);
+                    cfg->dpdk.proc_mask = strdup(buf);
 		}
                 count++;
             }
@@ -260,7 +261,7 @@ __parse_config_list(uint16_t *arr, int *sz, const char *value) {
     int nr_ele = 0;
     int max_ele = *sz;
 
-    strncpy(input, value, 4096);
+    strncpy(input, value, sizeof(input) - 1);
     nTokens = rte_strsplit(input, sizeof(input), tokens, 128, ',');
     for (i = 0; i < nTokens; i++) {
         char *tok = tokens[i];
@@ -578,6 +579,8 @@ ini_parse_handler(void* user, const char* section, const char* name,
         pconfig->dpdk.numa_on = atoi(value);
     } else if (MATCH("dpdk", "tso")) {
         pconfig->dpdk.tso = atoi(value);
+    } else if (MATCH("dpdk", "tx_csum_offoad_skip")) {
+        pconfig->dpdk.tx_csum_offoad_skip = atoi(value);
     } else if (MATCH("dpdk", "vlan_strip")) {
         pconfig->dpdk.vlan_strip = atoi(value);
     } else if (MATCH("dpdk", "idle_sleep")) {
@@ -622,7 +625,7 @@ dpdk_args_setup(struct ff_config *cfg)
 {
     int n = 0, i;
     dpdk_argv[n++] = strdup("f-stack");
-    char temp[DPDK_CONFIG_MAXLEN] = {0};
+    char temp[DPDK_CONFIG_MAXLEN] = {0}, temp2[DPDK_CONFIG_MAXLEN] = {0};
 
     if (cfg->dpdk.no_huge) {
         dpdk_argv[n++] = strdup("--no-huge");
@@ -654,20 +657,24 @@ dpdk_args_setup(struct ff_config *cfg)
                 cfg->dpdk.vdev_cfgs[i].vdev_id,
                 cfg->dpdk.vdev_cfgs[i].path);
             if (cfg->dpdk.vdev_cfgs[i].nb_queues) {
-                sprintf(temp, "%s,queues=%u",
-                    temp, cfg->dpdk.vdev_cfgs[i].nb_queues);
+                sprintf(temp2, ",queues=%u",
+                    cfg->dpdk.vdev_cfgs[i].nb_queues);
+                strcat(temp, temp2);
             }
             if (cfg->dpdk.vdev_cfgs[i].nb_cq) {
-                sprintf(temp, "%s,cq=%u",
-                    temp, cfg->dpdk.vdev_cfgs[i].nb_cq);
+                sprintf(temp2, ",cq=%u",
+                    cfg->dpdk.vdev_cfgs[i].nb_cq);
+                strcat(temp, temp2);
             }
             if (cfg->dpdk.vdev_cfgs[i].queue_size) {
-                sprintf(temp, "%s,queue_size=%u",
-                    temp, cfg->dpdk.vdev_cfgs[i].queue_size);
+                sprintf(temp2, ",queue_size=%u",
+                    cfg->dpdk.vdev_cfgs[i].queue_size);
+                strcat(temp, temp2);
             }
             if (cfg->dpdk.vdev_cfgs[i].mac) {
-                sprintf(temp, "%s,mac=%s",
-                    temp, cfg->dpdk.vdev_cfgs[i].mac);
+                sprintf(temp2, ",mac=%s",
+                    cfg->dpdk.vdev_cfgs[i].mac);
+                strcat(temp, temp2);
             }
             dpdk_argv[n++] = strdup(temp);
         }
@@ -687,38 +694,45 @@ dpdk_args_setup(struct ff_config *cfg)
                 cfg->dpdk.bond_cfgs[i].slave);
 
                 if (cfg->dpdk.bond_cfgs[i].primary) {
-                    sprintf(temp, "%s,primary=%s",
-                    temp, cfg->dpdk.bond_cfgs[i].primary);
+                    sprintf(temp2, ",primary=%s",
+                        cfg->dpdk.bond_cfgs[i].primary);
+                    strcat(temp, temp2);
                 }
 
                 if (cfg->dpdk.bond_cfgs[i].socket_id) {
-                    sprintf(temp, "%s,socket_id=%d",
-                    temp, cfg->dpdk.bond_cfgs[i].socket_id);
+                    sprintf(temp2, ",socket_id=%d",
+                        cfg->dpdk.bond_cfgs[i].socket_id);
+                    strcat(temp, temp2);
                 }
 
                 if (cfg->dpdk.bond_cfgs[i].bond_mac) {
-                    sprintf(temp, "%s,mac=%s",
-                    temp, cfg->dpdk.bond_cfgs[i].bond_mac);
+                    sprintf(temp2, ",mac=%s",
+                        cfg->dpdk.bond_cfgs[i].bond_mac);
+                    strcat(temp, temp2);
                 }
 
                 if (cfg->dpdk.bond_cfgs[i].xmit_policy) {
-                    sprintf(temp, "%s,xmit_policy=%s",
-                    temp, cfg->dpdk.bond_cfgs[i].xmit_policy);
+                    sprintf(temp2, ",xmit_policy=%s",
+                        cfg->dpdk.bond_cfgs[i].xmit_policy);
+                    strcat(temp, temp2);
                 }
 
                 if (cfg->dpdk.bond_cfgs[i].lsc_poll_period_ms) {
-                    sprintf(temp, "%s,lsc_poll_period_ms=%d",
-                    temp, cfg->dpdk.bond_cfgs[i].lsc_poll_period_ms);
+                    sprintf(temp2, ",lsc_poll_period_ms=%d",
+                        cfg->dpdk.bond_cfgs[i].lsc_poll_period_ms);
+                    strcat(temp, temp2);
                 }
 
                 if (cfg->dpdk.bond_cfgs[i].up_delay) {
-                    sprintf(temp, "%s,up_delay=%d",
-                    temp, cfg->dpdk.bond_cfgs[i].up_delay);
+                    sprintf(temp2, ",up_delay=%d",
+                        cfg->dpdk.bond_cfgs[i].up_delay);
+                    strcat(temp, temp2);
                 }
 
                 if (cfg->dpdk.bond_cfgs[i].down_delay) {
-                    sprintf(temp, "%s,down_delay=%d",
-                    temp, cfg->dpdk.bond_cfgs[i].down_delay);
+                    sprintf(temp2, ",down_delay=%d",
+                        cfg->dpdk.bond_cfgs[i].down_delay);
+                    strcat(temp, temp2);
                 }
                 dpdk_argv[n++] = strdup(temp);
         }
