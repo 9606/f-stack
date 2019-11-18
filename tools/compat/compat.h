@@ -86,7 +86,7 @@
 #define CLOCK_MONOTONIC_FAST    12      /* FreeBSD-specific. */
 
 #define AF_INET6_LINUX    10
-#define PF_INET6_LINUX    AF_INET6
+#define PF_INET6_LINUX    AF_INET6_LINUX
 #endif
 
 void *reallocf(void *ptr, size_t size);

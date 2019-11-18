@@ -46,7 +46,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/file.h>
 #include <sys/protosw.h>
 #include <sys/socket.h>
-#include <sys/socketvar.h>
 #include <sys/sysctl.h>
 
 #include <netinet/in.h>

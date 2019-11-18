@@ -28,7 +28,7 @@
 #define _FF_IPC_H_
 
 #include "ff_msg.h"
-#include "ff_event.h"
+#include "ff_api.h"
 
 /* Set F-Stack proccess id to communicate with */
 void ff_set_proc_id(int pid);

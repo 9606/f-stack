@@ -33,7 +33,6 @@
 #include <rte_malloc.h>
 #include <unistd.h>
 
-#include <ff_api.h>
 #include "ff_ipc.h"
 
 static int inited;
