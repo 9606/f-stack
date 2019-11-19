@@ -15,7 +15,7 @@
 #include <sys/time.h>
 #include <netdb.h>
 #include <err.h>
-
+#include <sysexits.h>
 
 #include "ff_api.h"
 #include "ff_ipc.h"
@@ -53,6 +53,14 @@ struct timeval end_time;
 struct timeval last_time;
 struct timeval now_time;
 struct timeval time_interval;
+
+
+static void usage() __dead2;
+
+static void
+usage(){
+    errx(EX_USAGE, "usage: ping -p <f-stack proc_id> dest");
+}
 
 void ping_stats_show() {
     long time = time_interval.tv_sec * 1000 + time_interval.tv_usec / 1000;
@@ -226,13 +234,24 @@ int recv_loop() {
 
 int main(int argc, char *argv[]) {
     ff_ipc_init();
-    ff_set_proc_id(0);
+
+    int ch;
+    while ((ch = getopt(argc, argv, "p:")) != -1){
+        switch(ch) {
+            case 'p':
+                ff_set_proc_id(atoi(optarg));
+                break;
+            default:
+                usage();
+        }
+
+    }
+    if (argc - optind != 1)
+        usage();
+
+    char *dest_addr_str = argv[optind];
 
     assert((kq = ff_ipc_kqueue()) > 0);
-
-    char dest_addr_str[80];
-    memset(dest_addr_str, 0, 80);
-    memcpy(dest_addr_str, argv[argc - 1], strlen(argv[argc - 1]) + 1);
 
     rawsock = ff_ipc_socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
 
@@ -275,5 +294,6 @@ int main(int argc, char *argv[]) {
         recv_loop();
     }
 
+    ff_ipc_sock_close(rawsock);
     return 0;
 }

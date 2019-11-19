@@ -1267,7 +1267,17 @@ handle_sock_send_msg(struct ff_msg *msg) {
         msg->result = 0;
     }
 }
+static inline void
+handle_sock_close_msg(struct ff_msg *msg) {
+    int rt = ff_close(msg->sock_close.fd);
+    msg->sock_close.rt = rt;
 
+    if (rt < 0) {
+        msg->result = errno;
+    } else {
+        msg->result = 0;
+    }
+}
 #ifdef FF_NETGRAPH
 static inline void
 handle_ngctl_msg(struct ff_msg *msg)
@@ -1384,6 +1394,8 @@ handle_msg(struct ff_msg *msg, uint16_t proc_id)
         case FF_KQUEUE:
             handle_kqueue_msg(msg);
             break;
+        case FF_SOCK_CLOSE:
+            handle_sock_close_msg(msg);
         default:
             handle_default_msg(msg);
             break;

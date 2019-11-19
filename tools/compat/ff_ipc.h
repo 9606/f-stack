@@ -46,6 +46,7 @@ int ff_ipc_sock_connect(int s, const struct sockaddr *name, socklen_t namelen);
 
 ssize_t ff_ipc_sock_read(int d, void *buf, size_t nbytes);
 ssize_t ff_ipc_sock_send(int s, const void *buf, size_t len, int flags);
+int ff_ipc_sock_close(int fd);
 
 int ff_ipc_kqueue(void);
 int ff_ipc_kevent(int kq, const struct kevent *changelist, int nchanges,

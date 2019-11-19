@@ -177,9 +177,9 @@ int ff_ipc_socket(int domain, int type, int protocol) {
     struct ff_msg *msg = ff_ipc_msg_alloc();
 
     msg->msg_type = FF_SOCKET;
-    msg->socket.domain = AF_INET;
-    msg->socket.type = SOCK_RAW;
-    msg->socket.protocol = IPPROTO_ICMP;
+    msg->socket.domain = domain;
+    msg->socket.type = type;
+    msg->socket.protocol = protocol;
 
     int ret = ff_ipc_send(msg);
     if (ret < 0) {
@@ -387,6 +387,39 @@ ssize_t ff_ipc_sock_send(int s, const void *buf, size_t len, int flags){
     msg->sock_send.flags = flags;
 
     bcopy(buf, msg->sock_send.buf, len);
+
+    int ret = ff_ipc_send(msg);
+    if (ret < 0) {
+        errno = EPIPE;
+        ff_ipc_msg_free(msg);
+        return -1;
+    }
+
+    struct ff_msg *retmsg;
+    do {
+        if (retmsg != NULL) {
+            ff_ipc_msg_free(retmsg);
+        }
+
+        ret = ff_ipc_recv(&retmsg, msg->msg_type);
+        if (ret < 0) {
+            errno = EPIPE;
+            ff_ipc_msg_free(msg);
+            return -1;
+        }
+    } while (msg != retmsg);
+
+    ssize_t rt = retmsg->sock_send.rt;
+
+    ff_ipc_msg_free(msg);
+    return rt;
+}
+
+int ff_ipc_sock_close(int fd){
+    struct ff_msg *msg = ff_ipc_msg_alloc();
+
+    msg->msg_type = FF_SOCK_CLOSE;
+    msg->sock_close.fd = fd;
 
     int ret = ff_ipc_send(msg);
     if (ret < 0) {

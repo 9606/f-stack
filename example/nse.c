@@ -67,7 +67,6 @@ int loop(void *arg)
     /* Wait for events to happen */
     unsigned nevents = ff_kevent(kq, NULL, 0, events, MAX_EVENTS, NULL);
     unsigned i;
-//    printf("nevents:%d\n", nevents);
 
     for (i = 0; i < nevents; ++i) {
         struct kevent event = events[i];

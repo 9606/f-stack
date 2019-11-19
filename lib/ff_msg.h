@@ -50,6 +50,7 @@ enum FF_MSG_TYPE {
     FF_KEVENT,
     FF_SOCK_READ,
     FF_SOCK_SEND,
+    FF_SOCK_CLOSE,
     /*
      * to add other msg type before FF_MSG_NUM
      */
@@ -154,6 +155,11 @@ struct ff_sock_send_args {
     ssize_t rt;
 };
 
+struct ff_sock_close_args {
+    int fd;
+    int rt;
+};
+
 #define MAX_MSG_BUF_SIZE 10240
 
 /* structure of ipc msg */
@@ -180,6 +186,7 @@ struct ff_msg {
         struct ff_kevent_args kevent;
         struct ff_sock_read_args sock_read;
         struct ff_sock_send_args sock_send;
+        struct ff_sock_close_args sock_close;
     };
 } __attribute__((packed)) __rte_cache_aligned;
 
