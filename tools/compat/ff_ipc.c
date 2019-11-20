@@ -188,7 +188,7 @@ int ff_ipc_socket(int domain, int type, int protocol) {
         return -1;
     }
 
-    struct ff_msg *retmsg;
+    struct ff_msg *retmsg = NULL;
     do {
         if (retmsg != NULL) {
             ff_ipc_msg_free(retmsg);
@@ -227,7 +227,7 @@ int ff_ipc_sock_connect(int s, const struct sockaddr *name, socklen_t namelen){
         return -1;
     }
 
-    struct ff_msg *retmsg;
+    struct ff_msg *retmsg = NULL;
     do {
         if (retmsg != NULL) {
             ff_ipc_msg_free(retmsg);
@@ -260,7 +260,7 @@ int ff_ipc_kqueue(void){
         return -1;
     }
 
-    struct ff_msg *retmsg;
+    struct ff_msg *retmsg = NULL;
     do {
         if (retmsg != NULL) {
             ff_ipc_msg_free(retmsg);
@@ -317,7 +317,7 @@ int ff_ipc_kevent(int kq, const struct kevent *changelist, int nchanges,
         return -1;
     }
 
-    struct ff_msg *retmsg;
+    struct ff_msg *retmsg = NULL;
     do {
         if (retmsg != NULL) {
             ff_ipc_msg_free(retmsg);
@@ -356,7 +356,7 @@ ssize_t ff_ipc_sock_read(int d, void *buf, size_t nbytes){
         return -1;
     }
 
-    struct ff_msg *retmsg;
+    struct ff_msg *retmsg = NULL;
     do {
         if (retmsg != NULL) {
             ff_ipc_msg_free(retmsg);
@@ -395,7 +395,7 @@ ssize_t ff_ipc_sock_send(int s, const void *buf, size_t len, int flags){
         return -1;
     }
 
-    struct ff_msg *retmsg;
+    struct ff_msg *retmsg = NULL;
     do {
         if (retmsg != NULL) {
             ff_ipc_msg_free(retmsg);
@@ -428,7 +428,7 @@ int ff_ipc_sock_close(int fd){
         return -1;
     }
 
-    struct ff_msg *retmsg;
+    struct ff_msg *retmsg = NULL;
     do {
         if (retmsg != NULL) {
             ff_ipc_msg_free(retmsg);

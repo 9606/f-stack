@@ -27,7 +27,7 @@ HOST_OS:=$(shell uname -s)
 
 FF_KNI=1
 #FF_NETGRAPH=1
-#FF_IPFW=1
+FF_IPFW=1
 #FF_USE_PAGE_ARRAY=1
 FF_INET6=1
 

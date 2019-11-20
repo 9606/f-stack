@@ -27,7 +27,7 @@ struct timeval last_time;
 struct timeval now_time;
 struct timeval time_interval;
 
-#define MAX_EVENTS 512
+#define MAX_EVENTS 8
 
 /* kevent set */
 struct kevent kevSet;
@@ -247,7 +247,6 @@ int main(int argc, char *argv[]) {
     alive = 1;
     while(alive){
         recv_loop();
-        usleep(100000);
     }
 
     return 0;
