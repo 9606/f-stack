@@ -45,12 +45,15 @@ enum FF_MSG_TYPE {
     FF_IPFW_CTL,
     FF_TRAFFIC,
     FF_SOCKET,
-    FF_SOCKET_CONNECT,
+    FF_CONNECT,
+    FF_BIND,
     FF_KQUEUE,
     FF_KEVENT,
-    FF_SOCK_READ,
-    FF_SOCK_SEND,
-    FF_SOCK_CLOSE,
+    FF_READ,
+    FF_SEND,
+    FF_CLOSE,
+    FF_SETSOCKOPT,
+    FF_RECVMSG,
     /*
      * to add other msg type before FF_MSG_NUM
      */
@@ -119,10 +122,17 @@ struct ff_socket_args {
     int socket_fd;
 };
 
-struct ff_sock_connect_args {
+struct ff_connect_args {
     int s;
     struct linux_sockaddr *name;
     socklen_t namelen;
+    int rt;
+};
+
+struct ff_bind_args {
+    int s;
+    struct linux_sockaddr *addr;
+    socklen_t addrlen;
     int rt;
 };
 
@@ -140,14 +150,14 @@ struct ff_kevent_args {
     int rt;
 };
 
-struct ff_sock_read_args {
+struct ff_read_args {
     int d;
     void *buf;
     size_t nbytes;
     ssize_t rt;
 };
 
-struct ff_sock_send_args {
+struct ff_send_args {
     int s;
     void *buf;
     size_t len;
@@ -155,12 +165,28 @@ struct ff_sock_send_args {
     ssize_t rt;
 };
 
-struct ff_sock_close_args {
+struct ff_close_args {
     int fd;
     int rt;
 };
 
-#define MAX_MSG_BUF_SIZE 10240
+struct ff_setsockopt_args {
+    int s;
+    int level;
+    int optname;
+    void *optval;
+    socklen_t optlen;
+    int rt;
+};
+
+struct ff_recvmsg_args {
+    int s;
+    struct msghdr *msg;
+    int flags;
+    int rt;
+};
+
+#define MAX_MSG_BUF_SIZE (10240 + 65535)
 
 /* structure of ipc msg */
 struct ff_msg {
@@ -181,12 +207,15 @@ struct ff_msg {
         struct ff_ipfw_args ipfw;
         struct ff_traffic_args traffic;
         struct ff_socket_args socket;
-        struct ff_sock_connect_args sock_connect;
+        struct ff_connect_args connect;
+        struct ff_bind_args bind;
         struct ff_kqueue_args kqueue;
         struct ff_kevent_args kevent;
-        struct ff_sock_read_args sock_read;
-        struct ff_sock_send_args sock_send;
-        struct ff_sock_close_args sock_close;
+        struct ff_read_args read;
+        struct ff_send_args send;
+        struct ff_close_args close;
+        struct ff_setsockopt_args setsockopt;
+        struct ff_recvmsg_args recvmsg;
     };
 } __attribute__((packed)) __rte_cache_aligned;
 

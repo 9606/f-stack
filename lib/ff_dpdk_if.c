@@ -442,8 +442,8 @@ init_msg_ring(void)
     /* Create message buffer pool */
     if (rte_eal_process_type() == RTE_PROC_PRIMARY) {
         message_pool = rte_mempool_create(FF_MSG_POOL,
-           MSG_RING_SIZE * FF_MSG_NUM * nb_procs,
-           MAX_MSG_BUF_SIZE, MSG_RING_SIZE / 2 * FF_MSG_NUM, 0,
+           MSG_RING_SIZE * 2 * nb_procs,
+           MAX_MSG_BUF_SIZE, MSG_RING_SIZE / 2, 0,
            NULL, NULL, ff_msg_init, NULL,
            socketid, 0);
     } else {
@@ -1209,9 +1209,21 @@ handle_socket_msg(struct ff_msg *msg) {
 }
 
 static inline void
-handle_sock_connect_msg(struct ff_msg *msg) {
-    int rt = ff_connect(msg->sock_connect.s, msg->sock_connect.name, msg->sock_connect.namelen);
-    msg->sock_connect.rt = rt;
+handle_connect_msg(struct ff_msg *msg) {
+    int rt = ff_connect(msg->connect.s, msg->connect.name, msg->connect.namelen);
+    msg->connect.rt = rt;
+
+    if (rt < 0) {
+        msg->result = errno;
+    } else {
+        msg->result = 0;
+    }
+}
+
+static inline void
+handle_bind_msg(struct ff_msg *msg) {
+    int rt = ff_bind(msg->bind.s, msg->bind.addr, msg->bind.addrlen);
+    msg->bind.rt = rt;
 
     if (rt < 0) {
         msg->result = errno;
@@ -1245,9 +1257,9 @@ handle_kevent_msg(struct ff_msg *msg) {
 }
 
 static inline void
-handle_sock_read_msg(struct ff_msg *msg) {
-    int rt = ff_read(msg->sock_read.d, msg->sock_read.buf, msg->sock_read.nbytes);
-    msg->sock_read.rt = rt;
+handle_read_msg(struct ff_msg *msg) {
+    int rt = ff_read(msg->read.d, msg->read.buf, msg->read.nbytes);
+    msg->read.rt = rt;
 
     if (rt < 0) {
         msg->result = errno;
@@ -1257,9 +1269,9 @@ handle_sock_read_msg(struct ff_msg *msg) {
 }
 
 static inline void
-handle_sock_send_msg(struct ff_msg *msg) {
-    int rt = ff_send(msg->sock_send.s, msg->sock_send.buf, msg->sock_send.len, msg->sock_send.flags);
-    msg->sock_send.rt = rt;
+handle_send_msg(struct ff_msg *msg) {
+    int rt = ff_send(msg->send.s, msg->send.buf, msg->send.len, msg->send.flags);
+    msg->send.rt = rt;
 
     if (rt < 0) {
         msg->result = errno;
@@ -1268,9 +1280,9 @@ handle_sock_send_msg(struct ff_msg *msg) {
     }
 }
 static inline void
-handle_sock_close_msg(struct ff_msg *msg) {
-    int rt = ff_close(msg->sock_close.fd);
-    msg->sock_close.rt = rt;
+handle_close_msg(struct ff_msg *msg) {
+    int rt = ff_close(msg->close.fd);
+    msg->close.rt = rt;
 
     if (rt < 0) {
         msg->result = errno;
@@ -1339,6 +1351,31 @@ handle_traffic_msg(struct ff_msg *msg)
 }
 
 static inline void
+handle_setsockopt_msg(struct ff_msg *msg) {
+    int rt = ff_setsockopt_freebsd(msg->setsockopt.s, msg->setsockopt.level, msg->setsockopt.optname,
+                                   msg->setsockopt.optval, msg->setsockopt.optlen);
+    msg->setsockopt.rt = rt;
+
+    if (rt < 0) {
+        msg->result = errno;
+    } else {
+        msg->result = 0;
+    }
+}
+
+static inline void
+handle_recvmsg_msg(struct ff_msg *msg) {
+    ssize_t rt = ff_recvmsg(msg->recvmsg.s, msg->recvmsg.msg, msg->recvmsg.flags);
+    msg->recvmsg.rt = rt;
+
+    if (rt < 0) {
+        msg->result = errno;
+    } else {
+        msg->result = 0;
+    }
+}
+
+static inline void
 handle_default_msg(struct ff_msg *msg)
 {
     msg->result = ENOTSUP;
@@ -1379,23 +1416,33 @@ handle_msg(struct ff_msg *msg, uint16_t proc_id)
         case FF_SOCKET:
             handle_socket_msg(msg);
             break;
-        case FF_SOCKET_CONNECT:
-            handle_sock_connect_msg(msg);
+        case FF_CONNECT:
+            handle_connect_msg(msg);
             break;
         case FF_KEVENT:
             handle_kevent_msg(msg);
             break;
-        case FF_SOCK_READ:
-            handle_sock_read_msg(msg);
+        case FF_READ:
+            handle_read_msg(msg);
             break;
-        case FF_SOCK_SEND:
-            handle_sock_send_msg(msg);
+        case FF_SEND:
+            handle_send_msg(msg);
             break;
         case FF_KQUEUE:
             handle_kqueue_msg(msg);
             break;
-        case FF_SOCK_CLOSE:
-            handle_sock_close_msg(msg);
+        case FF_CLOSE:
+            handle_close_msg(msg);
+            break;
+        case FF_SETSOCKOPT:
+            handle_setsockopt_msg(msg);
+            break;
+        case FF_RECVMSG:
+            handle_recvmsg_msg(msg);
+            break;
+        case FF_BIND:
+            handle_bind_msg(msg);
+            break;
         default:
             handle_default_msg(msg);
             break;

@@ -78,13 +78,13 @@ static int http_tcpclient_create(const char *host, int port) {
         return -1;
     }
 
-    ff_ipc_sock_connect(socket_fd, (struct sockaddr *) &server_addr, sizeof(server_addr));
+    ff_ipc_connect(socket_fd, (struct sockaddr *) &server_addr, sizeof(server_addr));
 
     return socket_fd;
 }
 
 static void http_tcpclient_close(int socket) {
-    ff_ipc_sock_close(socket);
+    ff_ipc_close(socket);
 }
 
 static int http_parse_url(const char *url, char *host, char *file, int *port) {
@@ -128,7 +128,7 @@ static int http_parse_url(const char *url, char *host, char *file, int *port) {
 static int http_tcpclient_recv(int socket, char *lpbuff) {
     int recvnum = 0;
 
-    recvnum = ff_ipc_sock_read(socket, lpbuff, BUFFER_SIZE * 4);
+    recvnum = ff_ipc_read(socket, lpbuff, BUFFER_SIZE * 4);
 
     return recvnum;
 }
@@ -138,7 +138,7 @@ static int http_tcpclient_send(int socket, char *buff, int size) {
 
     int sent = 0, tmpres = 0;
     while (sent < size) {
-        tmpres = ff_ipc_sock_send(socket, buff + sent, size - sent, 0);
+        tmpres = ff_ipc_socksend(socket, buff + sent, size - sent, 0);
         if (tmpres == -1) {
             return -1;
         }

@@ -28,7 +28,15 @@
 #define _FF_IPC_H_
 
 #include "ff_msg.h"
-#include "ff_api.h"
+#include "ff_event.h"
+#include "sys/socket.h"
+
+#ifndef _FSTACK_API_H
+struct linux_sockaddr {
+    short sa_family;
+    char sa_data[126];
+};
+#endif
 
 /* Set F-Stack proccess id to communicate with */
 void ff_set_proc_id(int pid);
@@ -40,18 +48,24 @@ int ff_ipc_msg_free(struct ff_msg *msg);
 int ff_ipc_send(const struct ff_msg *msg);
 int ff_ipc_recv(struct ff_msg **msg, enum FF_MSG_TYPE msg_type);
 
-/* POSIX-LIKE-IPC api begin */
+/* POSIX-LIKE api begin */
 int ff_ipc_socket(int domain, int type, int protocol);
-int ff_ipc_sock_connect(int s, const struct sockaddr *name, socklen_t namelen);
+int ff_ipc_connect(int s, const struct sockaddr *name, socklen_t namelen);
+int ff_ipc_bind(int s, const struct sockaddr *addr, socklen_t addrlen);
+int ff_ipc_setsockopt(int s, int level, int optname, const void *optval,
+                  socklen_t optlen);
+int ff_ipc_getsockopt(int s, int level, int optname, void *optval,
+                  socklen_t *optlen);
+int ff_ipc_close(int fd);
 
-ssize_t ff_ipc_sock_read(int d, void *buf, size_t nbytes);
-ssize_t ff_ipc_sock_send(int s, const void *buf, size_t len, int flags);
-int ff_ipc_sock_close(int fd);
+ssize_t ff_ipc_read(int d, void *buf, size_t nbytes);
+ssize_t ff_ipc_socksend(int s, const void *buf, size_t len, int flags);
+ssize_t ff_ipc_recvmsg(int s, struct msghdr *msg, int flags);
+
 
 int ff_ipc_kqueue(void);
 int ff_ipc_kevent(int kq, const struct kevent *changelist, int nchanges,
                   struct kevent *eventlist, int nevents, const struct timespec *timeout);
-
 /* POSIX-LIKE-IPC api end */
 
 #endif

@@ -4,6 +4,8 @@
 
 TOPDIR?=${CURDIR}/../..
 
-PROG=ping
+PROG=   ping
+
+SRCS=	ping.c utils.c
 
 include ${TOPDIR}/tools/prog.mk

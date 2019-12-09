@@ -32,6 +32,7 @@
 #include <rte_mempool.h>
 #include <rte_malloc.h>
 #include <unistd.h>
+#include "netinet/in.h"
 
 #include "ff_ipc.h"
 
@@ -173,6 +174,32 @@ ff_ipc_recv(struct ff_msg **msg, enum FF_MSG_TYPE msg_type)
     return ret;
 }
 
+int
+ff_ipc_send_recv(struct ff_msg *msg){
+    int ret = ff_ipc_send(msg);
+    if (ret < 0) {
+        errno = EPIPE;
+        ff_ipc_msg_free(msg);
+        return -1;
+    }
+
+    struct ff_msg *retmsg = NULL;
+    do {
+        if (retmsg != NULL) {
+            ff_ipc_msg_free(retmsg);
+        }
+
+        ret = ff_ipc_recv(&retmsg, msg->msg_type);
+        if (ret < 0) {
+            errno = EPIPE;
+            ff_ipc_msg_free(msg);
+            return -1;
+        }
+    } while (msg != retmsg);
+
+    return 0;
+}
+
 int ff_ipc_socket(int domain, int type, int protocol) {
     struct ff_msg *msg = ff_ipc_msg_alloc();
 
@@ -181,67 +208,89 @@ int ff_ipc_socket(int domain, int type, int protocol) {
     msg->socket.type = type;
     msg->socket.protocol = protocol;
 
-    int ret = ff_ipc_send(msg);
-    if (ret < 0) {
-        errno = EPIPE;
-        ff_ipc_msg_free(msg);
-        return -1;
-    }
+    int ret = ff_ipc_send_recv(msg);
+    if (ret < 0) return ret;
 
-    struct ff_msg *retmsg = NULL;
-    do {
-        if (retmsg != NULL) {
-            ff_ipc_msg_free(retmsg);
-        }
-
-        ret = ff_ipc_recv(&retmsg, msg->msg_type);
-        if (ret < 0) {
-            errno = EPIPE;
-            ff_ipc_msg_free(msg);
-            return -1;
-        }
-    } while (msg != retmsg);
-
-    int socket_fd = retmsg->socket.socket_fd;
+    int socket_fd = msg->socket.socket_fd;
 
     ff_ipc_msg_free(msg);
     return socket_fd;
 }
 
-int ff_ipc_sock_connect(int s, const struct sockaddr *name, socklen_t namelen){
+int ff_ipc_setsockopt(int s, int level, int optname, const void *optval,
+                      socklen_t optlen){
     struct ff_msg *msg = ff_ipc_msg_alloc();
 
-    msg->msg_type = FF_SOCKET_CONNECT;
-    msg->sock_connect.s = s;
+    msg->msg_type = FF_SETSOCKOPT;
+    msg->setsockopt.s = s;
+    msg->setsockopt.level = level;
+    msg->setsockopt.optname = optname;
+    msg->setsockopt.optval = msg->buf_addr;
+    msg->setsockopt.optlen = optlen;
 
-    msg->sock_connect.name = (struct linux_sockaddr *)(msg->buf_addr);
-    msg->sock_connect.name->sa_family = name->sa_family;
-    bcopy(name->sa_data, msg->sock_connect.name->sa_data,name->sa_len - sizeof(msg->sock_connect.name->sa_family));
+    bcopy(optval, msg->setsockopt.optval, optlen);
 
-    msg->sock_connect.namelen = namelen;
+    int ret = ff_ipc_send_recv(msg);
+    if (ret < 0) return ret;
 
-    int ret = ff_ipc_send(msg);
-    if (ret < 0) {
-        errno = EPIPE;
-        ff_ipc_msg_free(msg);
-        return -1;
-    }
+    ssize_t rt = msg->setsockopt.rt;
 
-    struct ff_msg *retmsg = NULL;
-    do {
-        if (retmsg != NULL) {
-            ff_ipc_msg_free(retmsg);
-        }
+    ff_ipc_msg_free(msg);
+    return rt;
+}
 
-        ret = ff_ipc_recv(&retmsg, msg->msg_type);
-        if (ret < 0) {
-            errno = EPIPE;
-            ff_ipc_msg_free(msg);
-            return -1;
-        }
-    } while (msg != retmsg);
+int ff_ipc_connect(int s, const struct sockaddr *name, socklen_t namelen){
+    struct ff_msg *msg = ff_ipc_msg_alloc();
 
-    int rt = retmsg->sock_connect.rt;
+    msg->msg_type = FF_CONNECT;
+    msg->connect.s = s;
+    // convert freebsd sock to linux sock
+    msg->connect.name = (struct linux_sockaddr *)(msg->buf_addr);
+    msg->connect.name->sa_family = name->sa_family;
+    bcopy(name->sa_data, msg->connect.name->sa_data,name->sa_len - sizeof(msg->connect.name->sa_family));
+
+    msg->connect.namelen = namelen;
+
+    int ret = ff_ipc_send_recv(msg);
+    if (ret < 0) return ret;
+
+    int rt = msg->connect.rt;
+
+    ff_ipc_msg_free(msg);
+    return rt;
+}
+
+int ff_ipc_bind(int s, const struct sockaddr *addr, socklen_t addrlen){
+    struct ff_msg *msg = ff_ipc_msg_alloc();
+
+    msg->msg_type = FF_BIND;
+    msg->bind.s = s;
+    // convert freebsd sock to linux sock
+    msg->bind.addr = (struct linux_sockaddr *)(msg->buf_addr);
+    msg->bind.addr->sa_family = addr->sa_family;
+    bcopy(addr->sa_data, msg->bind.addr->sa_data,addr->sa_len - sizeof(msg->bind.addr->sa_family));
+
+    msg->bind.addrlen = addrlen;
+
+    int ret = ff_ipc_send_recv(msg);
+    if (ret < 0) return ret;
+
+    int rt = msg->bind.rt;
+
+    ff_ipc_msg_free(msg);
+    return rt;
+}
+
+int ff_ipc_close(int fd){
+    struct ff_msg *msg = ff_ipc_msg_alloc();
+
+    msg->msg_type = FF_CLOSE;
+    msg->close.fd = fd;
+
+    int ret = ff_ipc_send_recv(msg);
+    if (ret < 0) return ret;
+
+    ssize_t rt = msg->close.rt;
 
     ff_ipc_msg_free(msg);
     return rt;
@@ -253,28 +302,10 @@ int ff_ipc_kqueue(void){
     msg->msg_type = FF_KQUEUE;
     msg->kqueue.kq = 0;
 
-    int ret = ff_ipc_send(msg);
-    if (ret < 0) {
-        errno = EPIPE;
-        ff_ipc_msg_free(msg);
-        return -1;
-    }
+    int ret = ff_ipc_send_recv(msg);
+    if (ret < 0) return ret;
 
-    struct ff_msg *retmsg = NULL;
-    do {
-        if (retmsg != NULL) {
-            ff_ipc_msg_free(retmsg);
-        }
-
-        ret = ff_ipc_recv(&retmsg, msg->msg_type);
-        if (ret < 0) {
-            errno = EPIPE;
-            ff_ipc_msg_free(msg);
-            return -1;
-        }
-    } while (msg != retmsg);
-
-    int rt = retmsg->kqueue.kq;
+    int rt = msg->kqueue.kq;
 
     ff_ipc_msg_free(msg);
     return rt;
@@ -310,139 +341,98 @@ int ff_ipc_kevent(int kq, const struct kevent *changelist, int nchanges,
         bcopy(timeout, msg->kevent.timeout, sizeof(struct timespec));
     }
 
-    int ret = ff_ipc_send(msg);
-    if (ret < 0) {
-        errno = EPIPE;
-        ff_ipc_msg_free(msg);
-        return -1;
-    }
+    int ret = ff_ipc_send_recv(msg);
+    if (ret < 0) return ret;
 
-    struct ff_msg *retmsg = NULL;
-    do {
-        if (retmsg != NULL) {
-            ff_ipc_msg_free(retmsg);
-        }
-
-        ret = ff_ipc_recv(&retmsg, msg->msg_type);
-        if (ret < 0) {
-            errno = EPIPE;
-            ff_ipc_msg_free(msg);
-            return -1;
-        }
-    } while (msg != retmsg);
-
-    int rt = retmsg->kevent.rt;
+    int rt = msg->kevent.rt;
     if (rt > 0) {
-        bcopy(retmsg->kevent.eventlist, eventlist, nevents * sizeof(struct kevent));
+        bcopy(msg->kevent.eventlist, eventlist, nevents * sizeof(struct kevent));
     }
 
     ff_ipc_msg_free(msg);
     return rt;
 }
 
-ssize_t ff_ipc_sock_read(int d, void *buf, size_t nbytes){
+ssize_t ff_ipc_read(int d, void *buf, size_t nbytes){
     struct ff_msg *msg = ff_ipc_msg_alloc();
 
-    msg->msg_type = FF_SOCK_READ;
+    msg->msg_type = FF_READ;
 
-    msg->sock_read.d = d;
-    msg->sock_read.buf = msg->buf_addr;
-    msg->sock_read.nbytes = nbytes;
+    msg->read.d = d;
+    msg->read.buf = msg->buf_addr;
+    msg->read.nbytes = nbytes;
 
-    int ret = ff_ipc_send(msg);
-    if (ret < 0) {
-        errno = EPIPE;
-        ff_ipc_msg_free(msg);
-        return -1;
-    }
+    int ret = ff_ipc_send_recv(msg);
+    if (ret < 0) return ret;
 
-    struct ff_msg *retmsg = NULL;
-    do {
-        if (retmsg != NULL) {
-            ff_ipc_msg_free(retmsg);
-        }
-
-        ret = ff_ipc_recv(&retmsg, msg->msg_type);
-        if (ret < 0) {
-            errno = EPIPE;
-            ff_ipc_msg_free(msg);
-            return -1;
-        }
-    } while (msg != retmsg);
-
-    ssize_t rt = retmsg->sock_read.rt;
-    bcopy(msg->sock_read.buf, buf, nbytes);
+    ssize_t rt = msg->read.rt;
+    bcopy(msg->read.buf, buf, nbytes);
 
     ff_ipc_msg_free(msg);
     return rt;
 }
 
-ssize_t ff_ipc_sock_send(int s, const void *buf, size_t len, int flags){
-    struct ff_msg *msg = ff_ipc_msg_alloc();
+ssize_t ff_ipc_recvmsg(int s, struct msghdr *msg, int flags) {
+    struct ff_msg *rpc_msg = ff_ipc_msg_alloc();
+    rpc_msg->msg_type = FF_RECVMSG;
 
-    msg->msg_type = FF_SOCK_SEND;
-    msg->sock_send.s = s;
-    msg->sock_send.buf = msg->buf_addr;
-    msg->sock_send.len = len;
-    msg->sock_send.flags = flags;
+    rpc_msg->recvmsg.s = s;
+    rpc_msg->recvmsg.flags = flags;
 
-    bcopy(buf, msg->sock_send.buf, len);
+    rpc_msg->recvmsg.msg = (struct msghdr *) rpc_msg->buf_addr;
+    bcopy(msg, rpc_msg->recvmsg.msg, sizeof(struct msghdr));
 
-    int ret = ff_ipc_send(msg);
-    if (ret < 0) {
-        errno = EPIPE;
-        ff_ipc_msg_free(msg);
-        return -1;
+    rpc_msg->recvmsg.msg->msg_name = rpc_msg->recvmsg.msg + sizeof(struct msghdr);
+    bcopy(msg->msg_name, rpc_msg->recvmsg.msg->msg_name, sizeof(struct sockaddr_in));
+
+    rpc_msg->recvmsg.msg->msg_iov = (struct iovec *) (rpc_msg->recvmsg.msg->msg_name + sizeof(struct linux_sockaddr));
+    rpc_msg->recvmsg.msg->msg_iov->iov_base = rpc_msg->recvmsg.msg->msg_iov + sizeof(struct iovec);
+    rpc_msg->recvmsg.msg->msg_iov->iov_len = msg->msg_iov->iov_len;
+
+    rpc_msg->recvmsg.msg->msg_control = rpc_msg->recvmsg.msg->msg_iov->iov_base + rpc_msg->recvmsg.msg->msg_iov->iov_len;
+    rpc_msg->recvmsg.msg->msg_flags = msg->msg_flags;
+
+    int ret = ff_ipc_send_recv(rpc_msg);
+    if (ret < 0) return ret;
+
+    ssize_t rt = rpc_msg->recvmsg.rt;
+    if (rt > 0){
+        // msg_namelen, msg_name, msg_iov, msg_controllen, msg_flags may be changed by recvmsg syscall
+        msg->msg_namelen = rpc_msg->recvmsg.msg->msg_namelen;
+        // converte linux_sockaddr to freebsd socket
+        struct linux_sockaddr*  linux_sock = (struct linux_sockaddr*) rpc_msg->recvmsg.msg->msg_name;
+        struct sockaddr* freebsd_sock = (struct sockaddr*)msg->msg_name;
+        freebsd_sock->sa_family = linux_sock->sa_family;
+        freebsd_sock->sa_len = msg->msg_namelen;
+        bcopy(linux_sock->sa_data, freebsd_sock->sa_data, msg->msg_namelen - sizeof(linux_sock->sa_family));
+
+        msg->msg_iov->iov_len = rpc_msg->recvmsg.msg->msg_iov->iov_len + rt;
+        bcopy(rpc_msg->recvmsg.msg->msg_iov->iov_base - rt, msg->msg_iov->iov_base, rt);
+
+        msg->msg_controllen = rpc_msg->recvmsg.msg->msg_controllen;
+        bcopy(rpc_msg->recvmsg.msg->msg_control, msg->msg_control, msg->msg_controllen);
+        msg->msg_flags = rpc_msg->recvmsg.msg->msg_flags;
     }
 
-    struct ff_msg *retmsg = NULL;
-    do {
-        if (retmsg != NULL) {
-            ff_ipc_msg_free(retmsg);
-        }
-
-        ret = ff_ipc_recv(&retmsg, msg->msg_type);
-        if (ret < 0) {
-            errno = EPIPE;
-            ff_ipc_msg_free(msg);
-            return -1;
-        }
-    } while (msg != retmsg);
-
-    ssize_t rt = retmsg->sock_send.rt;
-
-    ff_ipc_msg_free(msg);
+    ff_ipc_msg_free(rpc_msg);
     return rt;
 }
 
-int ff_ipc_sock_close(int fd){
+ssize_t ff_ipc_socksend(int s, const void *buf, size_t len, int flags){
     struct ff_msg *msg = ff_ipc_msg_alloc();
 
-    msg->msg_type = FF_SOCK_CLOSE;
-    msg->sock_close.fd = fd;
+    msg->msg_type = FF_SEND;
+    msg->send.s = s;
+    msg->send.buf = msg->buf_addr;
+    msg->send.len = len;
+    msg->send.flags = flags;
 
-    int ret = ff_ipc_send(msg);
-    if (ret < 0) {
-        errno = EPIPE;
-        ff_ipc_msg_free(msg);
-        return -1;
-    }
+    bcopy(buf, msg->send.buf, len);
 
-    struct ff_msg *retmsg = NULL;
-    do {
-        if (retmsg != NULL) {
-            ff_ipc_msg_free(retmsg);
-        }
+    int ret = ff_ipc_send_recv(msg);
+    if (ret < 0) return ret;
 
-        ret = ff_ipc_recv(&retmsg, msg->msg_type);
-        if (ret < 0) {
-            errno = EPIPE;
-            ff_ipc_msg_free(msg);
-            return -1;
-        }
-    } while (msg != retmsg);
-
-    ssize_t rt = retmsg->sock_send.rt;
+    ssize_t rt = msg->send.rt;
 
     ff_ipc_msg_free(msg);
     return rt;
